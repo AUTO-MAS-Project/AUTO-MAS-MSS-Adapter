@@ -7,8 +7,8 @@
 项目更新插件经服务 ``maafw.owner.mss_adapter.v1`` 现取这里建的 ``BuiltinConfigOwner``，按确切类型
 ``MSSConfig`` 认领 MSS 托管；管理器也从这里取（``resolve_owner``），属主名照旧是 ``mss_adapter``。
 
-规则 L：本模块顶层只导入标准库、解析库和本包的 ``rules``；项目更新插件的 ``glue.owner_entry`` 在
-``build_owner`` 里现导入。
+规则 L：本模块顶层只导入标准库、解析库和本包的 ``rules``；专项共用库的 ``owner_entry``（它用到时才取项目
+更新插件的属主协议数据类）在 ``build_owner`` 里现导入。
 """
 
 from __future__ import annotations
@@ -49,8 +49,8 @@ def build_owner() -> Any:
     """建本包的属主入口并记下（插件 ``on_enable`` 调）。"""
 
     global _OWNER
+    from maafw_adapter_kit.owner_entry import BuiltinConfigOwner
     from maafw_interface.interface.plan_rules import EMPTY_PLAN_RULES
-    from maafw_project_update.glue.owner_entry import BuiltinConfigOwner
 
     from .config import MSSConfig
 

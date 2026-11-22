@@ -29,20 +29,20 @@ from typing import Any
 
 from auto_mas_core.devices.task import game_device_id, game_target_id
 from auto_mas_core.host.core import Config
-from maafw_project_update.glue.backup_archive import read_overlay_values
+from maafw_adapter_kit.backup_archive import read_overlay_values
+from maafw_adapter_kit.default_snapshot import fill_default_task_snapshots
+from maafw_adapter_kit.option_secrets import (
+    script_task_snapshots,
+    user_task_snapshot,
+)
 from maafw_interface.interface.models import MaaFWInterface
 from maafw_interface.runner.plan_transforms import MaaFWPeriodLimits
 from maafw_interface.runner.run_plan import resolve_run_selection
-from maafw_project_update.glue.default_snapshot import fill_default_task_snapshots
 from maafw_runner.host.desktop_game import MaaFWDesktopGameSpec
 from maafw_project_update.host.embedded_project import (
     follow_source_enabled,
     resolve_maafw_project_root,
     shell_hint_from_report,
-)
-from maafw_project_update.glue.option_secrets import (
-    script_task_snapshots,
-    user_task_snapshot,
 )
 from maafw_runner.host.proxy_quota import (
     proxy_times_used_up as _proxy_times_used_up,
@@ -59,32 +59,33 @@ from mss_adapter.config import MSSConfig
 from mss_adapter.rules import PLAN_MODE_FIXED
 
 # ---------------------------------------------------------------------------
-# SDK 未公开的宿主函数：用到时现导入（0.1.0 越界，见 README「已知问题」）
+# 宿主函数：经 SDK 出口用到时现取（客户端绑定、游戏目标在 auto_mas_core.host，Unity 分辨率在宿主
+# app.utils 的再导出里）
 # ---------------------------------------------------------------------------
 
 
 def client_executable_path(script: Any) -> Any:
-    from app.task.client import client_executable_path as _impl
+    from auto_mas_core.host.task_client import client_executable_path as _impl
 
     return _impl(script)
 
 
 def client_launcher_path(script: Any) -> Any:
-    from app.task.client import client_launcher_path as _impl
+    from auto_mas_core.host.task_client import client_launcher_path as _impl
 
     return _impl(script)
 
 
 def game_is_emulator(owner: Any) -> bool:
-    from app.task.game import game_is_emulator as _impl
+    from auto_mas_core.host.task_game import game_is_emulator as _impl
 
     return _impl(owner)
 
 
 def parse_resolution_option(value: Any) -> Any:
-    from app.utils.common.game_resolution import parse_resolution_option as _impl
+    from auto_mas_core.host.utils import game_resolution
 
-    return _impl(value)
+    return game_resolution.parse_resolution_option(value)
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +159,7 @@ def emulator_device(script: Any) -> str:
 
 
 async def fill_default_snapshots(script_id: str, script: Any) -> None:
-    """新账号的默认任务队列（经 ``Config.update_user`` 走 MSS 登记的配置回调）。"""
+    """新账号的默认任务队列（经 ``Config.update_user`` 走插件的保存前钩子，加密照常）。"""
 
     await fill_default_task_snapshots(script_id, script)
 
@@ -332,23 +333,17 @@ def silent_mode() -> bool:
     return bool(Config.setting.Function.IfSilence)
 
 
-def import_paths() -> list[Any]:
-    """worker 的导入路径：插件版交给 runner 自己算（``request.import_paths or worker_import_paths()``），
-    这里给空表。"""
-
-    return []
-
-
 def client_version() -> str:
     """建计划时写进 ``PI_CLIENT_VERSION`` 的宿主版本号。
 
-    解析库不再自己按文件位置找宿主（``build_arranged_plan(..., client_version=)``），取值照搬原来的
-    ``run_plan._load_client_version``：宿主源码根 ``res/version.json`` 的 ``version``，不是字符串或读失败给 ``""``。
+    解析库不再自己按文件位置找宿主（``build_arranged_plan(..., client_version=)``），取值照宿主迁移分支的
+    ``seams/host_version.host_client_version``：宿主资源目录 ``res/version.json`` 的 ``version``，不是字符串
+    或读失败给 ``""``。
     """
 
     try:
         data = json.loads(
-            (Path(Config.source_path) / "res" / "version.json").read_text(encoding="utf-8")
+            (Path(Config.resource_path) / "version.json").read_text(encoding="utf-8")
         )
         version = data.get("version")
         return version if isinstance(version, str) else ""
@@ -518,7 +513,6 @@ __all__ = [
     "game_wait_time",
     "hotkeys_raw",
     "if_activity_first_raw",
-    "import_paths",
     "is_mss_script",
     "last_proxy_date",
     "lookup_script",

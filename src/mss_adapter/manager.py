@@ -38,7 +38,7 @@ from auto_mas_core.host.models_emulator import DeviceBase, DeviceProvider
 from auto_mas_core.host.models_notification_report import TaskResultData, TaskResultReport
 from auto_mas_core.host.models_schema import WSTaskNoticeData
 from auto_mas_core.host.models_task import ScriptItem, UserItem
-from maafw_project_update.glue.backup_archive import (
+from maafw_adapter_kit.backup_archive import (
     archive_mas_runtime_backup,
     archive_native_backup,
 )
@@ -108,9 +108,9 @@ def _owner_name() -> str:
 
 
 def _current_game_session() -> Any:
-    """宿主 L2 的游戏会话（``app.task.game.current_game_session``，SDK 未公开）：用到时现导入。"""
+    """宿主 L2 的游戏会话（``current_game_session``，经 SDK 出口）：用到时现取。"""
 
-    from app.task.game import current_game_session
+    from auto_mas_core.host.task_game import current_game_session
 
     return current_game_session
 

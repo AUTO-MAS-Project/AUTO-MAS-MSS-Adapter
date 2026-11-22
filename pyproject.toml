@@ -15,7 +15,9 @@ keywords = [
   "auto-mas-plugin",
   "auto-mas-id:mss_adapter",
 ]
-# 0.1.0 直接 import 三块积木插件的模块（越界清单见 README），所以对积木也写次版本上限。
+# 直接 import 三块积木插件与专项共用库的模块（越界清单见 README），所以对积木也写次版本上限。
+# 托管生命周期钩子、按配置判定游戏类型与桌面分身要宿主带 SDK 三组出口；这几项出口没有单独抬 SDK 的版本号
+# （仍是 5.9.0b1），下限写不出区别，插件导入时按 ScriptAdapterPlugin / ScriptTypeDecl 上有没有这些出口检查。
 dependencies = [
   "auto-mas-core>=5.9.0b1,<6",
   "auto-mas-maafw-interface>=0.1.0,<0.2",
@@ -23,6 +25,7 @@ dependencies = [
   "auto-mas-maafw-agent-env>=0.1.0,<0.2",
   "auto-mas-maafw-runner>=0.1.0,<0.2",
   "auto-mas-maafw-project-update>=0.1.0,<0.2",
+  "auto-mas-maafw-adapter-kit>=0.1.0,<0.2",
 ]
 
 [project.urls]
@@ -51,4 +54,4 @@ ignore = ["F403", "F405"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["mss_adapter"]
-known-third-party = ["app", "auto_mas_core", "maafw_interface", "maafw_native", "maafw_agent_env", "maafw_runner", "maafw_project_update"]
+known-third-party = ["app", "auto_mas_core", "maafw_interface", "maafw_native", "maafw_agent_env", "maafw_runner", "maafw_project_update", "maafw_adapter_kit"]

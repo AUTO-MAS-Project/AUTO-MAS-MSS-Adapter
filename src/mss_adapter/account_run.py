@@ -115,7 +115,7 @@ from maafw_runner.host.host_client import (
     script_adb_env,
     workstation_lock_reason,
 )
-from maafw_project_update.glue.option_secrets import (
+from maafw_adapter_kit.option_secrets import (
     DPAPI_SECRET_OPENER,
     open_task_snapshot,
 )
@@ -212,9 +212,9 @@ def _format_maafw() -> Any:
 
 
 def _desktop_process_target() -> Any:
-    """宿主的桌面分身进程目标（``ContextVar``，SDK 未公开）：用到时现导入。"""
+    """宿主的桌面分身进程目标（``ContextVar``，经 SDK 出口）：用到时现取。"""
 
-    from app.utils.common.process.session import desktop_process_target
+    from auto_mas_core.host.utils_common_process_session import desktop_process_target
 
     return desktop_process_target
 
@@ -823,8 +823,8 @@ class MSSAccountRun(TaskExecuteBase):
         running: bool | None = None
         # 只在前半段说要查时查（活动不在队列里要补 / 在队列里要判，两者互斥），每次运行最多一次
         if head.state.probe_needed:
-            # 按需导入、按模块属性调：本包在导入期不拉起网络模块
-            from app.tools.common.game_calendar import stella
+            # 按需导入、按模块属性调：本包在导入期不拉起网络模块（经 SDK 出口取宿主的星塔日历）
+            from auto_mas_core.host.tools_common_game_calendar import stella
 
             try:
                 running = await stella.has_running_official_activity()
@@ -1127,7 +1127,6 @@ class MSSAccountRun(TaskExecuteBase):
             ),
             game_start_disk_quiet=self._disk_quiet,
             game_wait_seconds=config_view.game_wait_time(self.script_config),
-            import_paths=config_view.import_paths(),
             # 与运行前更新 / 预检同一份解析：托管级 Update.ProxyAddress 优先，留空跟随全局
             proxy_url=config_view.proxy_url(self.script_config),
             agent_plans=self._worker_agent_plans,
