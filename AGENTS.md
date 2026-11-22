@@ -1,5 +1,8 @@
 # app/task/MSS — MSS 专项：自己的账号流程，用 MFW 的积木
 
+> 迁移前的宿主约束：本文从宿主迁移分支 `46785ce81` 的 `app/task/MSS/AGENTS.md` 搬来，删掉了风味路径与回退两节。
+> 文中的 `app/task/MaaFW/...`、`app/task/MSS/...` 路径指宿主旧位置；插件版的对应关系见 README。
+
 进这个目录之前先读 `app/task/MaaFW/AGENTS.md`：MSS（MaaStellaSora / 星塔旅人）的项目更新、内嵌副本、运行池、
 agent 环境、worker 运行、结果判定、通知正文、失败截图、周期任务、代理次数……都是 MFW 积木的既有语义，MSS 只调、
 不重写。
@@ -84,39 +87,7 @@ dev 时，凡是改了 `app/task/MaaFW/tools/embedded/runner_task.py` 的，要�
 导出目录里反向应用两个翻登记提交，实施方案 §13.1）；实时对拍旧路径显式用 MFW 管理器 + 风味路径。本目录的新
 模块引用了宿主函数时，把模块路径加进 `harness.NEW_FLOW_MODULES`。
 
-**回退第 10 步** = revert 翻登记的那一个提交（只改 `registration.py`）：`manager_factory` 换回 MFW 管理器，MSS 托管
-回到风味路径，本目录的流程文件留着不被调用。所以第 11 步之前 `flavor.py` 和 MFW 通用流程里的风味分支都不能删，
-下面「风味路径」一节描述的就是回退后的行为。
-
-## 本目录的其它文件与风味路径（回退本体，第 11 步删）
-
-`flavor.py`（`FLAVOR` 对象，满足 `app/task/MaaFW/tools/embedded/flavor.py` 的 `MaaFWFlavor` 协议）是回退以后
-MFW 管理器跑 MSS 时用的那一层；它做的事穷举如下，多一件都没有：
-
-1. `matches_project(interface)`：`mirrorchyan_rid == SSAH` / `github` 仓库名命中 /
-   `name` 命中，任一即认领；后两条**同一口径**——等于 `MaaStellaSora` 或以 `MaaStellaSora-` 开头
-   （`MaaStellaSoraX` 这种只是同前缀的不算，`https://github.com/MaaStellaSora` 这种组织主页也取不到仓库名）\
-   ——官方版与个人版等
-   衍生版（如 `beichen24a1/MaaStellaSora-Personal`）都认。**托管类型在新建时就定了，导入什么项目都不换**：
-   MSS 托管导入、重新导入或克隆不认领的项目时，引擎在动副本之前直接拒绝（「这不是 MSS 项目。要用别的项目，
-   请新建通用 MFW 托管。」）；通用 MFW 托管导入 MSS 项目仍是通用托管、按通用项目跑。**认领只用来拒收**；
-   更新谱系仍按 `mirrorchyan_rid` / `github` / `name` 各自分开。
-2. `decorate_selection(...)`，按这个顺序：
-   - 账号 `Info.PlanMode` 引用了 MSS 计划表时，按当天槽位改写 entry `战斗_入口`（悬赏试炼快速战斗）的
-     `悬赏试炼关卡` / `悬赏试炼跳过难度选择` / `选择悬赏试炼难度` / `悬赏试炼消耗所有干劲` / `自定义快速作战次数`；
-     队列里没有这个任务就补上。关卡名不在 interface 的 case 里就整条跳过。`Fixed` 时不动。
-   - 队列里有 entry `活动快速战斗_入口` 时查一次 `app/tools/common/game_calendar/stella.py`（只认会开活动关的「版本活动」）：
-     有活动就挪到悬赏试炼前，确实没有就摘掉，取不到数据就原样跑。
-   - entry `星塔_入口_agent`（新版爬塔）挪到队尾。每周一次靠 MaaFW 通用的 `Run.WeeklyOnceTasks`，这里不记周。
-   按 entry 找不到就写一行账号日志跳过。**不重写**重试 / 周期 / 超时 / 更新 / 游戏启停。
-   自动加入（悬赏试炼、活动）不补回引擎判定本轮不跑的实例（红灯、今天不在运行日），这份集合取
-   `context.excluded_task_ids`，不自己解析快照；核心建计划时还会按红灯再滤一遍。
-   钩子抛异常就是该账号本次建计划失败（记「异常」、不跑、不重试），取不到数据一律按「说不准」处理。
-3. `skip_on_retry_entries`：按公开 task entry 声明已确认的日常与挑战任务，复用 MaaFW 的
-   「前面的尝试已完成」过滤。本次运行成功过的任务不再补跑，失败、超时和未执行的任务保留；
-   登录不在声明内，每次尝试仍执行。同名重复任务沿用引擎的保守重跑策略，不额外推断完成的是哪份。
-
-`flavor.py` 只是一层外壳（本目录自己的流程直接用下面两个模块）：
+## 规则与排队列
 
 - `rules.py`：三个 entry、`MSS_SKIP_ON_RETRY`（上面第 3 条的名单就是它）、`TYPE_KEY`、`PLAN_MODE_FIXED`、
   `is_mss_project` / `github_repo_name`，全包只有这一份；只依赖解析一侧。

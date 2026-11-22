@@ -21,43 +21,71 @@ MSS 自己的两项：账号引用的计划表今天那一格（:func:`plan_slot
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from app.core import Config
-from app.models.config import MSSConfig
-from app.task.client import client_executable_path, client_launcher_path
-from app.task.game import game_device_id, game_is_emulator, game_target_id
-from app.task.MaaFW.tools.backup_archive import read_overlay_values
-from app.task.MaaFW.tools.core.interface.models import MaaFWInterface
-from app.task.MaaFW.tools.core.runner.plan_transforms import MaaFWPeriodLimits
-from app.task.MaaFW.tools.core.runner.run_plan import resolve_run_selection
-from app.task.MaaFW.tools.embedded.default_snapshot import fill_default_task_snapshots
-from app.task.MaaFW.tools.embedded.desktop_game import MaaFWDesktopGameSpec
-from app.task.MaaFW.tools.embedded.embedded_project import (
+from auto_mas_core.devices.task import game_device_id, game_target_id
+from auto_mas_core.host.core import Config
+from maafw_project_update.glue.backup_archive import read_overlay_values
+from maafw_interface.interface.models import MaaFWInterface
+from maafw_interface.runner.plan_transforms import MaaFWPeriodLimits
+from maafw_interface.runner.run_plan import resolve_run_selection
+from maafw_project_update.glue.default_snapshot import fill_default_task_snapshots
+from maafw_runner.host.desktop_game import MaaFWDesktopGameSpec
+from maafw_project_update.host.embedded_project import (
     follow_source_enabled,
     resolve_maafw_project_root,
     shell_hint_from_report,
 )
-from app.task.MaaFW.tools.embedded.option_secrets import (
+from maafw_project_update.glue.option_secrets import (
     script_task_snapshots,
     user_task_snapshot,
 )
-from app.task.MaaFW.tools.embedded.proxy_quota import (
+from maafw_runner.host.proxy_quota import (
     proxy_times_used_up as _proxy_times_used_up,
 )
-from app.task.MaaFW.tools.embedded.resource_repair import MaaFWRepairRequest
-from app.task.MaaFW.tools.embedded.run_settings import period_limits as _period_limits
-from app.task.MaaFW.tools.embedded.update_credentials import (
+from maafw_project_update.host.resource_repair import MaaFWRepairRequest
+from maafw_runner.host.run_settings import period_limits as _period_limits
+from maafw_project_update.host.update_credentials import (
     AutoUpdateMode,
     resolve_auto_update_mode,
     resolve_update_credentials,
     resolve_update_proxy_url,
 )
-from app.task.MSS.rules import PLAN_MODE_FIXED
-from app.utils.common.game_resolution import parse_resolution_option
+from mss_adapter.config import MSSConfig
+from mss_adapter.rules import PLAN_MODE_FIXED
+
+# ---------------------------------------------------------------------------
+# SDK 未公开的宿主函数：用到时现导入（0.1.0 越界，见 README「已知问题」）
+# ---------------------------------------------------------------------------
+
+
+def client_executable_path(script: Any) -> Any:
+    from app.task.client import client_executable_path as _impl
+
+    return _impl(script)
+
+
+def client_launcher_path(script: Any) -> Any:
+    from app.task.client import client_launcher_path as _impl
+
+    return _impl(script)
+
+
+def game_is_emulator(owner: Any) -> bool:
+    from app.task.game import game_is_emulator as _impl
+
+    return _impl(owner)
+
+
+def parse_resolution_option(value: Any) -> Any:
+    from app.utils.common.game_resolution import parse_resolution_option as _impl
+
+    return _impl(value)
+
 
 # ---------------------------------------------------------------------------
 # 托管（脚本级）
@@ -89,9 +117,10 @@ def script_name(script: Any) -> Any:
 
 
 def user_collection(script: Any) -> Any:
-    """托管的账号集合（``UserData``）：按 uid 下标取账号配置，不存在时照原样抛 ``KeyError``。"""
+    """托管的账号集合（插件配置类上是 ``users``，原 ``UserData``）：按 uid 下标取账号配置，不存在时照原样抛
+    ``KeyError``。"""
 
-    return script.UserData
+    return script.users
 
 
 def user_items(users: Any) -> list[tuple[uuid.UUID, Any]]:
@@ -304,9 +333,27 @@ def silent_mode() -> bool:
 
 
 def import_paths() -> list[Any]:
-    """worker 的导入路径：MAS 源码根。"""
+    """worker 的导入路径：插件版交给 runner 自己算（``request.import_paths or worker_import_paths()``），
+    这里给空表。"""
 
-    return [Config.source_path]
+    return []
+
+
+def client_version() -> str:
+    """建计划时写进 ``PI_CLIENT_VERSION`` 的宿主版本号。
+
+    解析库不再自己按文件位置找宿主（``build_arranged_plan(..., client_version=)``），取值照搬原来的
+    ``run_plan._load_client_version``：宿主源码根 ``res/version.json`` 的 ``version``，不是字符串或读失败给 ``""``。
+    """
+
+    try:
+        data = json.loads(
+            (Path(Config.source_path) / "res" / "version.json").read_text(encoding="utf-8")
+        )
+        version = data.get("version")
+        return version if isinstance(version, str) else ""
+    except Exception:  # noqa: BLE001 - 与原函数同一口径：读不到就给空串
+        return ""
 
 
 # ---------------------------------------------------------------------------
@@ -461,6 +508,7 @@ __all__ = [
     "adb_path_raw",
     "all_task_snapshots",
     "auto_update_mode",
+    "client_version",
     "configured_hwnd",
     "desktop_spec",
     "emulator_device",

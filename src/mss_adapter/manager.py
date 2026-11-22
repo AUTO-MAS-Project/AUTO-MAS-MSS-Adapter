@@ -25,30 +25,29 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-from app.config import config_manager
-from app.core import Notify, Publisher
+from auto_mas_core.host.config import config_manager
+from auto_mas_core.host.core import Notify, Publisher
 from app.core.notify.lifecycle import NotificationTaskBase
-from app.core.notify.task_content import (
+from auto_mas_core.host.core_notify_task_content import (
     NOTIFY_SCREENSHOT_LIMIT,
     prepare_screenshot_images,
     screenshot_entries,
 )
-from app.core.ws import protocol
-from app.models.emulator import DeviceBase, DeviceProvider
-from app.models.notification.report import TaskResultData, TaskResultReport
-from app.models.schema import WSTaskNoticeData
-from app.models.task import ScriptItem, UserItem
-from app.task.game import current_game_session
-from app.task.MaaFW.tools.backup_archive import (
+from auto_mas_core.host.core_ws import protocol
+from auto_mas_core.host.models_emulator import DeviceBase, DeviceProvider
+from auto_mas_core.host.models_notification_report import TaskResultData, TaskResultReport
+from auto_mas_core.host.models_schema import WSTaskNoticeData
+from auto_mas_core.host.models_task import ScriptItem, UserItem
+from maafw_project_update.glue.backup_archive import (
     archive_mas_runtime_backup,
     archive_native_backup,
 )
-from app.task.MaaFW.tools.core.native.architecture import (
+from maafw_native.architecture import (
     describe_unsupported_architecture,
 )
-from app.task.MaaFW.tools.embedded import owners
-from app.task.MaaFW.tools.embedded.owners import RecordPatch, write_managed_record
-from app.task.MaaFW.tools.embedded.project_session import (
+from maafw_project_update.host import owners
+from maafw_project_update.host.owners import RecordPatch, write_managed_record
+from maafw_project_update.host.project_session import (
     BENIGN_SKIPS,
     SKIP_OCCUPIED,
     MaaFWProjectDownload,
@@ -64,28 +63,28 @@ from app.task.MaaFW.tools.embedded.project_session import (
     discover_prefetch,
     project_request_from_record,
 )
-from app.task.MaaFW.tools.embedded.proxy_quota import proxy_today
-from app.task.MaaFW.tools.embedded.run_messages import update_log_lines
-from app.task.MaaFW.tools.embedded.run_notices import (
+from maafw_runner.host.proxy_quota import proxy_today
+from maafw_runner.host.run_messages import update_log_lines
+from maafw_runner.host.run_notices import (
     proxy_result_body,
     signal_summary_title,
     user_results_text,
 )
-from app.task.MaaFW.tools.embedded.runtime_check import describe_unusable_runtime
-from app.task.MaaFW.tools.embedded.runtime_route import resolve_runtime_pool_route
-from app.task.MaaFW.tools.embedded.signal_notice import (
+from maafw_agent_env.host.runtime_check import describe_unusable_runtime
+from maafw_agent_env.host.runtime_route import resolve_runtime_pool_route
+from maafw_runner.host.signal_notice import (
     SERVER_MAINTENANCE,
     MaaFWSignalTracker,
     push_signal_notices,
 )
-from app.task.MaaFW.tools.embedded.telemetry_project import record_project_run
-from app.task.MaaFW.tools.embedded.update_credentials import AutoUpdateMode
-from app.task.MSS import config_view
-from app.task.run_flow import point
-from app.utils import TASK_MODE_ZH, get_logger
+from maafw_runner.host.telemetry_project import record_project_run
+from maafw_project_update.host.update_credentials import AutoUpdateMode
+from mss_adapter import config_view
+from auto_mas_core.adapters.script import point
+from auto_mas_core.host.utils import TASK_MODE_ZH, get_logger
 
 if TYPE_CHECKING:  # pragma: no cover - 仅供类型检查，运行期不导入 maa
-    from app.task.MSS.account_run import MSSAccountRun
+    from mss_adapter.account_run import MSSAccountRun
 
 # 与通用 MFW 的管理器同名：app.log 的检索习惯不变
 logger = get_logger("MFW 内置运行")
@@ -95,17 +94,25 @@ _TELEMETRY_SCRIPT_TYPE = "MSS"
 
 
 def _owner_entry() -> Any:
-    """MSS 自己的托管属主入口（``registration``），每次现取。"""
+    """MSS 自己的托管属主入口（``owner``，插件启用时建），每次现取。"""
 
-    from app.task.MSS.registration import _resolve_owner
+    from mss_adapter.owner import resolve_owner
 
-    return _resolve_owner()
+    return resolve_owner()
 
 
 def _owner_name() -> str:
-    from app.task.MSS.registration import MSS_OWNER
+    from mss_adapter.owner import MSS_OWNER
 
     return MSS_OWNER
+
+
+def _current_game_session() -> Any:
+    """宿主 L2 的游戏会话（``app.task.game.current_game_session``，SDK 未公开）：用到时现导入。"""
+
+    from app.task.game import current_game_session
+
+    return current_game_session
 
 
 class _ManagedRecordMissing(RuntimeError):
@@ -130,9 +137,13 @@ class MSSManager(NotificationTaskBase):
         script_info: ScriptItem,
         *,
         device_provider: DeviceProvider | None = None,
+        host_locked_config: Any = None,
     ):
         super().__init__()
 
+        # 插件路径（``expander.MSSExpander``）：宿主 L2 已经拿着这个托管的 X 锁（不可重入），
+        # ``_check`` 就不再自己 ``try_lock_x()``，也不往 ``config_locks`` 里放票；锁由 L2 释放。
+        self._host_locked_config = host_locked_config
         if script_info.task_info is None:
             raise RuntimeError("ScriptItem 未绑定到 TaskItem")
 
@@ -263,10 +274,12 @@ class MSSManager(NotificationTaskBase):
                 return problem
             # X 票留在管理器任务上下文；取得后才释放项目预约，两者连续交接。
             # 照旧直接 try_lock_x()，不走 lock_script_config。
-            ticket = await script_config.try_lock_x()
-            if ticket is None:
-                return SKIP_OCCUPIED
-            self.config_locks[config_view.script_uid(script_config)] = ticket
+            # 宿主已持锁（插件路径）时跳过取锁，只记「已锁」。
+            if self._host_locked_config is None:
+                ticket = await script_config.try_lock_x()
+                if ticket is None:
+                    return SKIP_OCCUPIED
+                self.config_locks[config_view.script_uid(script_config)] = ticket
             self._script_locked = True
         except Exception as exc:  # noqa: BLE001 - OSError 之类也要给用户一句话
             return describe_open_failure(script_id, exc)
@@ -295,7 +308,7 @@ class MSSManager(NotificationTaskBase):
             try:
                 await callback(script_config)
             except BaseException as exc:
-                from app.utils.common.fluxdown_cli import FluxdownCancelUnconfirmed
+                from auto_mas_core.host.utils_common_fluxdown_cli import FluxdownCancelUnconfirmed
 
                 ticket = self.config_locks.pop(
                     config_view.script_uid(script_config), None
@@ -330,7 +343,7 @@ class MSSManager(NotificationTaskBase):
         if not emulator_id or emulator_id == "-":
             return None
 
-        from app.core import GameManager
+        from auto_mas_core.host.core import GameManager
 
         device_provider = self._device_provider or GameManager.get_emulator_instance
         try:
@@ -343,7 +356,7 @@ class MSSManager(NotificationTaskBase):
         """``route`` 是运行池路由（``resolve_runtime_pool_route``），调用方在工作线程里取。"""
 
         # 延迟导入：账号流程经 runner 包 import maa，导入即打开 DLL。
-        from app.task.MSS.account_run import MSSAccountRun
+        from mss_adapter.account_run import MSSAccountRun
 
         assert self.script_config is not None
         assert self.user_config is not None
@@ -403,7 +416,7 @@ class MSSManager(NotificationTaskBase):
         elif isinstance(event, MaaFWProjectPoint):
             point(self, event.stage, state=event.state, key=event.key)
         elif isinstance(event, MaaFWProjectDownload):
-            from app.core.downloads import download_observer
+            from auto_mas_core.host.core_downloads import download_observer
 
             observer = download_observer.get()
             if observer is not None:
@@ -602,7 +615,7 @@ class MSSManager(NotificationTaskBase):
                     await self._finalize_inner_task()
                     self._reclaim_unused_update_logs()
             finally:
-                session = current_game_session.get()
+                session = _current_game_session().get()
                 if session is not None:
                     await session.release_account()
         self._users_completed = True
@@ -616,7 +629,7 @@ class MSSManager(NotificationTaskBase):
         留底的实例不能还是托管级或上一个账号的。
         """
 
-        session = current_game_session.get()
+        session = _current_game_session().get()
         if session is None:
             return True
         assert self.user_config is not None

@@ -23,12 +23,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from app.task.MaaFW.tools.core.interface.models import (
+from maafw_interface.interface.models import (
     MaaFWInterface,
     resolve_task_instance_name,
     task_name_for_entry,
 )
-from app.task.MSS.rules import ACTIVITY_ENTRY, CLIMB_ENTRY, TRIBULATION_ENTRY
+from mss_adapter.rules import ACTIVITY_ENTRY, CLIMB_ENTRY, TRIBULATION_ENTRY
 
 ## 悬赏试炼的五个选项（后两对是 switch 的 No 分支带出来的子选项，值与父选项平铺在一起）
 OPTION_TRIBULATION_STAGE = "悬赏试炼关卡"
