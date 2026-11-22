@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import calendar
 import json
+import warnings
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path as NativePath
@@ -64,6 +65,16 @@ from auto_mas_core.host.models_config_shared import (
 )
 from auto_mas_core.host.utils import constants as _utils_constants
 from pydantic import Field
+
+# SDK 基类上有同名的嵌套元数据类（``UserEntry.Info`` 等），业务分组 ``Info`` / ``Notify`` 的字段名与序列化键
+# 都不能改：pydantic 建这几个类时每次都报「shadows an attribute in parent」。只滤掉本模块这三个类的这两个字段，
+# 别的类照常报。
+warnings.filterwarnings(
+    "ignore",
+    message=r'Field name "(Info|Notify)" in "(MSSPlanConfig|MSSUserConfig|MSSConfig)" '
+    r"shadows an attribute in parent ",
+    category=UserWarning,
+)
 
 # ---------------------------------------------------------------------------
 # 计划表
