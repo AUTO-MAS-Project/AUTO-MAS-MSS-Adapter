@@ -708,13 +708,10 @@ class MSSAccountRun(TaskExecuteBase):
             and self.run_signal != SERVER_MAINTENANCE
             and not self.stopped_manually,
         )
+        # 收尾里抛的异常（例如脚本后任务失败）原样外抛，由宿主旧生命周期桥
+        # （_LegacyExecution._finalize）调一次 on_crash；这里再调就会记两次异常、发两条通知。
         try:
             await self._finalize_user()
-        except Exception as error:
-            if not self._history_saved:
-                with suppress(Exception):
-                    await self.on_crash(error)
-            raise
         finally:
             try:
                 if not self._history_saved:
