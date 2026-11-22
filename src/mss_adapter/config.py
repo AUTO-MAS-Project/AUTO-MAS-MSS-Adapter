@@ -23,17 +23,15 @@ import json
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path as NativePath
-from typing import Annotated, Any, ClassVar, Literal, Self, cast
+from typing import Annotated, Any, ClassVar, Literal
 from uuid import UUID
 
 from auto_mas_core import PlanEntry, ScriptEntry, UserEntry
 from auto_mas_core.host.config import (
-    ConfigEntry,
     ConfigGroup,
     ConfigCollection,
     Virtual,
     collection,
-    config_manager,
     encrypted,
     legacy,
     ref,
@@ -404,31 +402,6 @@ class MSSUserConfig(UserEntry):
     def plugin_enabled(self):
         """向宿主提供账号启用状态（``Info.Status``）。"""
         return self.Info.Status
-
-    async def update(
-        self, other: ConfigEntry, *, check_visibility: bool = True
-    ) -> None:
-        """保存前处理（宿主不给插件类型绑配置回调）：照 MAA 专项，只取补丁里明确给出的组与字段，
-        交给 MFW 的 ``prepare_user_update``（插件版只剩加密）原地准备后再提交。"""
-        if not check_visibility or "Task" not in other.model_fields_set:
-            await super().update(cast(Self, other), check_visibility=check_visibility)
-            return
-        from maafw_project_update.glue.user_update import prepare_user_update
-
-        collection_ = self.parent
-        script = collection_.parent if collection_ is not None else None
-        # Entry 导出是完整配置视图；保存补丁只读取明确传入的组与字段，避免默认值覆盖绑定。
-        data = {
-            group: {field: values.__dict__[field] for field in values.model_fields_set}
-            for group in other.model_fields_set
-            if group in other._cfg_group_fields
-            and isinstance(values := other.__dict__[group], ConfigGroup)
-        }
-        await prepare_user_update(script, self, data=data)
-        async with config_manager.execution_gate():
-            await super().update(
-                type(self).model_validate(data), check_visibility=check_visibility
-            )
 
 
 # ---------------------------------------------------------------------------
