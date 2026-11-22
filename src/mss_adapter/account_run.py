@@ -708,6 +708,8 @@ class MSSAccountRun(TaskExecuteBase):
             and self.run_signal != SERVER_MAINTENANCE
             and not self.stopped_manually,
         )
+        if self.stopped_manually:
+            self._append_log("已手动停止", warning=True)
         # 收尾里抛的异常（例如脚本后任务失败）原样外抛，由宿主旧生命周期桥
         # （_LegacyExecution._finalize）调一次 on_crash；这里再调就会记两次异常、发两条通知。
         try:
