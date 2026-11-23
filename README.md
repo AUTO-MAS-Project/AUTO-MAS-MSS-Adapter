@@ -58,9 +58,10 @@ L3 收尾，不再被覆盖成「完成」；管理器回调出错时也记「�
 **越界导入**（规则 L：只在函数体内首次导入，或落在只在函数体内才被导入的模块里）：
 
 - 直接 import 积木插件的模块（开工文档 §3.2 S1、S2）：`manager.py`、`account_run.py`、`config_view.py` 顶层导入
-  `maafw_runner.host.*`、`maafw_runner.core.runner.run_events`、`maafw_project_update.host.*`、`maafw_agent_env.host.*`。
-  这三个流程模块只由 `expander.py`、`owner.py` 在函数体内首次导入；`hooks.py` 里用到的项目更新模块都在函数体内导入。
-  专项共用代码改从库 `maafw_adapter_kit` 取（顶层只依赖解析库）。
+  `maafw_runner.host.*`、`maafw_project_update.host.*`、`maafw_agent_env.host.*`（跑计划、运行前设置、桌面游戏、设备配置、
+  记账与判定、项目会话与预约、运行池，等换成服务调用）。这三个流程模块只由 `expander.py`、`owner.py` 在函数体内首次
+  导入；`hooks.py` 里用到的项目更新模块都在函数体内导入。运行事件常量、打码、资源包失败说明、视图目录改从两块解析库
+  取；账号日志文案、通知正文、运行设置、代理次数、信号聚合、遥测与项目跳过原文改从专项共用库 `maafw_adapter_kit` 取。
 - 直接 import 宿主内部模块（SDK 还没有出口）：`manager.py` 顶层 `app.core.notify.lifecycle.NotificationTaskBase`（管理器的
   基类，挪不进函数体）；`account_run.py` 函数体内 `app.core.notify.formats.maafw`。其余宿主能力（客户端绑定、游戏目标、
   分身进程目标、星塔日历、Unity 分辨率等）都经 SDK 门面 `auto_mas_core.host.*`、`auto_mas_core.devices.task`、
