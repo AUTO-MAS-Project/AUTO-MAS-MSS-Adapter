@@ -13,12 +13,14 @@
   出错同样算「无法构建运行计划」）；再进工作线程 ``arrange.mss_arrange_tail``、按排好的队列建计划、周期过滤、
   桌面检查。日志先后与一次排完时一字不差。活动探测在事件循环上查（旧的风味路径在工作线程里查），
   这是与通用流程跑 MSS 时唯一的差别；
-- 没有运行前登录、游戏更新与登录交给首任务（ADB 也照样能跑：``ask_toolkit`` 恒为假，设备配置不插步骤）；
+- 没有运行前登录、游戏更新与登录交给首任务（ADB 也照样能跑：``ask_toolkit`` 恒为 ``never``，设备配置不插步骤）；
 - 重试：剔除本次运行已完成的任务用 ``MSS_SKIP_ON_RETRY``。
 
-跑计划、运行前设置、判定、记账、桌面游戏启停、开模拟器、文案与通知正文都调 ``MaaFW/tools/embedded``
-里的叶子，只传普通数据；读写配置一律经 ``config_view``。日志、进度点、历史与通知的先后与通用流程完全相同
-（logger 名、``lease_owner`` 也照旧）。
+跑计划、运行前设置、桌面游戏启停与检查、设备配置经 MFW 运行插件的服务（``account_*``、``plan_*``、
+``pretask_*``、``desktop_*``、``device_*``），项目预约、项目口径与资源包修复经 MFW 项目插件的服务
+（``run_reserve``、``project_context``、``repair_*``，交回预约经专项共用库 ``release_run_reservation``），都经
+``services.client`` 现取、只传 JSON 值；判定、记账、开模拟器、文案与通知正文取专项共用库。读写配置一律经
+``config_view``。日志、进度点、历史与通知的先后与通用流程完全相同（logger 名、``lease_owner`` 也照旧）。
 """
 
 from __future__ import annotations
