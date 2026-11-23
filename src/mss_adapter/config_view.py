@@ -44,11 +44,11 @@ from maafw_project_update.host.embedded_project import (
     follow_source_enabled,
     shell_hint_from_report,
 )
-from maafw_runner.host.proxy_quota import (
+from maafw_adapter_kit.proxy_quota import (
     proxy_times_used_up as _proxy_times_used_up,
 )
 from maafw_project_update.host.resource_repair import MaaFWRepairRequest
-from maafw_runner.host.run_settings import period_limits as _period_limits
+from maafw_adapter_kit.run_settings import period_limits as _period_limits
 from maafw_project_update.host.update_credentials import (
     AutoUpdateMode,
     resolve_auto_update_mode,

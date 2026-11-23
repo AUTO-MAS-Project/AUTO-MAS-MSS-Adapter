@@ -146,14 +146,15 @@ from maafw_project_update.host.project_path import (
     release_run_reservation,
     try_reserve_project_path,
 )
-from maafw_runner.host.proxy_quota import (
+from maafw_adapter_kit.proxy_quota import (
     proxy_day_rolled,
     proxy_today,
     success_settlement,
 )
 from maafw_project_update.host.resource_repair import MaaFWResourceRepair
-from maafw_runner.host.run_messages import (
+from maafw_adapter_kit.run_messages import (
     MISSING_TASK_NOTICE_PREFIX,
+    completed_result_log_lines,
     describe_failed_result,
     format_completed_task_labels,
     format_run_overview_log,
@@ -161,16 +162,17 @@ from maafw_runner.host.run_messages import (
     period_all_done_message,
     record_event_point,
     remaining_done_message,
+    result_task_labels,
     retry_skip_log_lines,
     signal_attempt_facts,
 )
-from maafw_runner.host.run_notices import (
+from maafw_adapter_kit.run_notices import (
     statistics_mark,
     statistics_title,
     success_notice_text,
 )
 from maafw_runner.host.run_record import RUN_RECORD_HISTORY_KEY
-from maafw_runner.host.run_settings import (
+from maafw_adapter_kit.run_settings import (
     load_json_dict,
     load_script_hotkeys,
     loop_guard,
@@ -182,7 +184,7 @@ from maafw_runner.host.run_verdict import (
     MaaFWWorkstationLocked,
     judge_attempt,
 )
-from maafw_runner.host.signal_notice import (
+from maafw_adapter_kit.signal_notice import (
     MAINTENANCE_LAST_STATUS,
     MAINTENANCE_SKIP_MESSAGE,
     SIGNAL_USER_MESSAGES,
@@ -198,22 +200,6 @@ from mss_adapter.rules import MSS_SKIP_ON_RETRY
 from auto_mas_core.adapters.script import begin_attempt, point
 from auto_mas_core.host.utils import UTC4, get_logger, power
 from auto_mas_core.host.utils_common_process_scope import current_process_scope
-
-# 运行积木早于「被项目停止」标记时没有这两个出口：结果里也不会有这一项，照旧写「任务完成」。
-try:
-    from maafw_runner.host.run_messages import (
-        completed_result_log_lines,
-        result_task_labels,
-    )
-except ImportError:  # pragma: no cover - 只有旧运行积木走这里
-
-    def completed_result_log_lines(plan: Any, result: Any) -> list[str]:
-        labels = format_completed_task_labels(plan, result.completedTasks)
-        return ["MaaFW 任务完成: " + ", ".join(labels)]
-
-    def result_task_labels(plan: Any, result: Any) -> list[str]:
-        return format_completed_task_labels(plan, result.completedTasks)
-
 
 # 与通用 MFW 的账号流程同名：app.log 的检索习惯不变
 logger = get_logger("MaaFW 插件自动代理")

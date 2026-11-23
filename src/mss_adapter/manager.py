@@ -47,9 +47,12 @@ from maafw_native.architecture import (
 )
 from maafw_project_update.host import owners
 from maafw_project_update.host.owners import RecordPatch, write_managed_record
-from maafw_project_update.host.project_session import (
+from maafw_adapter_kit.project_texts import (
     BENIGN_SKIPS,
     SKIP_OCCUPIED,
+    describe_open_failure,
+)
+from maafw_project_update.host.project_session import (
     MaaFWProjectDownload,
     MaaFWProjectEvent,
     MaaFWProjectLease,
@@ -59,13 +62,12 @@ from maafw_project_update.host.project_session import (
     MaaFWProjectRequest,
     MaaFWProjectSession,
     current_siblings,
-    describe_open_failure,
     discover_prefetch,
     project_request_from_record,
 )
-from maafw_runner.host.proxy_quota import proxy_today
-from maafw_runner.host.run_messages import update_log_lines
-from maafw_runner.host.run_notices import (
+from maafw_adapter_kit.proxy_quota import proxy_today
+from maafw_adapter_kit.run_messages import update_log_lines
+from maafw_adapter_kit.run_notices import (
     proxy_result_body,
     signal_summary_title,
     user_results_text,
@@ -73,11 +75,11 @@ from maafw_runner.host.run_notices import (
 from maafw_agent_env.host.runtime_check import describe_unusable_runtime
 from maafw_agent_env.host.runtime_route import resolve_runtime_pool_route
 from maafw_interface.runner.models import SERVER_MAINTENANCE
-from maafw_runner.host.signal_notice import (
+from maafw_adapter_kit.signal_notice import (
     MaaFWSignalTracker,
     push_signal_notices,
 )
-from maafw_runner.host.telemetry_project import record_project_run
+from maafw_adapter_kit.telemetry_project import record_project_run
 from maafw_project_update.host.update_credentials import AutoUpdateMode
 from mss_adapter import config_view
 from auto_mas_core.adapters.script import point
