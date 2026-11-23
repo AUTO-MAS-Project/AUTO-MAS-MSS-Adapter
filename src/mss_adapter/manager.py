@@ -73,9 +73,12 @@ from maafw_adapter_kit.run_notices import (
     signal_summary_title,
     user_results_text,
 )
+from maafw_adapter_kit.owner_entry import record_payload
 from maafw_adapter_kit.services import (
     AGENT_ENV_RUNTIME_CHECK,
     AGENT_ENV_RUNTIME_ROUTE,
+    PROJECT_CONTEXT,
+    project_context_request,
     runtime_check_request,
 )
 from maafw_interface.runner.models import SERVER_MAINTENANCE
@@ -84,7 +87,6 @@ from maafw_adapter_kit.signal_notice import (
     push_signal_notices,
 )
 from maafw_adapter_kit.telemetry_project import record_project_run
-from maafw_project_update.host.update_credentials import AutoUpdateMode
 from mss_adapter import config_view
 from mss_adapter.services import client as service_client
 from auto_mas_core.adapters.script import point
@@ -98,6 +100,9 @@ logger = get_logger("MFW 内置运行")
 
 # 遥测里的专项上报名（telemetry_project.record_project_run）
 _TELEMETRY_SCRIPT_TYPE = "MSS"
+
+#: 项目自动更新的时机（项目服务 ``project_context`` 回的 ``auto_update_mode``）。
+AutoUpdateMode = Literal["Off", "BeforeRun", "AfterRun"]
 
 
 def _owner_entry() -> Any:
@@ -377,6 +382,20 @@ class MSSManager(NotificationTaskBase):
             raise RuntimeError(reply.message)
         return SimpleNamespace(root=Path(reply["root"]), pool_id=reply["pool_id"])
 
+    async def _resolve_auto_update_mode(self) -> AutoUpdateMode:
+        """这个托管的项目自动更新时机（项目服务 ``project_context``，与项目更新自己同一口径）。"""
+
+        assert self.script_config is not None
+        reply = await service_client("项目口径").call(
+            PROJECT_CONTEXT,
+            project_context_request(
+                record_payload(str(self.script_info.script_id), self.script_config)
+            ),
+        )
+        if reply.failed:
+            raise RuntimeError(reply.message)
+        return cast(AutoUpdateMode, reply["auto_update_mode"])
+
     def _build_inner_task(self, route: Any) -> "MSSAccountRun":
         """``route`` 是 :meth:`_runtime_pool_route` 的结果（``root``、``pool_id``）。"""
 
@@ -579,7 +598,7 @@ class MSSManager(NotificationTaskBase):
 
         # 运行前更新：整个脚本一次，在第一位用户的账号任务建起来之前；更新完接着确认运行环境。
         # 账号全都今日代理次数已满时这一轮谁也不会跑：两步都不做、不联网。
-        self._auto_update_mode = config_view.auto_update_mode(self.script_config)
+        self._auto_update_mode = await self._resolve_auto_update_mode()
         today = proxy_today()
         if all(
             config_view.proxy_times_used_up(

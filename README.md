@@ -47,7 +47,7 @@ MSS（MaaStellaSora / 星塔旅人）专项插件：MSS 托管、账号与 MSS �
 | `prepare_user_update` | 保存账号前：全局选项双写、任务快照里的密码字段加密（专项共用库 `user_update`） |
 | `prepare_user_read`、`on_user_added` | 读账号前、新账号提交后：空任务队列按项目默认写成实打实的队列（项目没导入时留到下次） |
 | `on_script_cloned` | 复制托管：关掉目标的开发者模式，按来源载荷建目标视图并记下属主 `mss_adapter` |
-| `on_script_removed` | 删除托管：当场删掉这个托管的视图（记着别的属主或别的托管时不删），再起一轮运行池对账 |
+| `on_script_removed` | 删除托管：当场删掉这个托管的视图（记着别的属主时不删），再起一轮运行池对账（项目服务 `script_removed`） |
 | `decl.game_kind` | 所选控制器是 Adb 时只能绑模拟器，其余只能绑客户端；判断不了时不收窄 |
 | `decl.desktop_session` | 运行时会选的控制器是 Win32 才能进桌面分身 |
 | `teardown_blockers` | 还有 MSS 托管在跑时拒绝停用、重载、卸载 |

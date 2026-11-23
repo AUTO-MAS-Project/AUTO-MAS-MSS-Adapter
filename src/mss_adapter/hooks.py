@@ -13,16 +13,17 @@
 - 读账号前（``prepare_user_read``）、新账号提交后（``on_user_added``）：空任务队列按项目默认写成实打实的队列
   （专项共用库 ``default_snapshot``；项目还没导入时什么都不写，留到下一次）。
 - 复制托管（``on_script_cloned``）：关掉目标的开发者模式，按来源挂的载荷给目标建视图、当场记下本属主。
-- 删除托管（``on_script_removed``）：删掉这个托管的视图（视图记着别的属主或别的托管时不删），再起一轮运行池对账。
+- 删除托管（``on_script_removed``）：删掉这个托管的视图（视图记着别的属主时不删），再起一轮运行池对账。
+- 复制、删除托管经项目服务（``script_cloned_*``、``script_removed_*``，``services.client``）。
 - ``game_kind`` / ``desktop_session``：按托管所选控制器判定可绑的游戏类型、能不能进桌面分身（宿主
   ``config_handler.expected_game_kind`` 与 ``desktop_session/lifecycle.supports_task`` 里 MFW 那一段）。
 
-规则 L：本模块顶层只导入标准库、SDK 与本包的轻量模块；项目更新插件、专项共用库与解析库都在函数里现导入。
+规则 L：本模块顶层只导入标准库、SDK 与本包的轻量模块；专项共用库与解析库都在函数里现导入，三块服务插件
+只经服务调。
 """
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 from auto_mas_core.host.utils import get_logger
@@ -73,70 +74,66 @@ async def on_script_cloned(source: Any, target: Any) -> None:
     首次运行按来源目录导入。新视图当场记下本属主（``mss_adapter``）。
     """
 
-    from maafw_native.layout import view_dir
-    from maafw_project_update.host.embedded_project import (
-        FollowSourceCloneUnavailable,
-        clone_embedded_copy,
-        is_source_form,
-    )
-    from maafw_project_update.host.project_path import (
-        release_project_path,
-        try_reserve_project_path,
+    from maafw_adapter_kit.owner_entry import record_payload
+    from maafw_adapter_kit.services import (
+        PROJECT_SCRIPT_CLONED,
+        script_cloned_request,
     )
 
+    from .services import client
+
+    # 目标托管的 FollowSource=False 是专项自己的配置，调用前自己写；预约目标视图、物化视图都在项目服务的
+    # script_cloned 作业里做（原来直接调项目更新的 clone_embedded_copy）
     await target.update(
         type(target).model_validate({"Embedded": {"FollowSource": False}}),
         check_visibility=False,
     )
-    group_channel = str(source.Update.Channel or "stable")
-    source_form = is_source_form(source)
-
-    target_key = await try_reserve_project_path(view_dir(str(target.uid)))
-    if target_key is None:
-        return
-    try:
-        await asyncio.to_thread(
-            lambda: clone_embedded_copy(
-                source_script_id=str(source.uid),
-                target_script_id=str(target.uid),
-                group_channel=group_channel,
-                source_form=source_form,
-                owner=MSS_OWNER,
+    reply = await client("复制托管").run(
+        PROJECT_SCRIPT_CLONED,
+        script_cloned_request(
+            source_id=str(source.uid),
+            target_id=str(target.uid),
+            owner=MSS_OWNER,
+            source_record=record_payload(str(source.uid), source),
+        ),
+    )
+    if reply.skipped:
+        if reply.reason == "follow_source_clone_unavailable":
+            logger.info(
+                f"复制托管时先不建视图，第一次运行前按来源目录导入: {reply.message}"
             )
-        )
-    except FollowSourceCloneUnavailable as exc:
-        logger.info(f"复制托管时先不建视图，第一次运行前按来源目录导入: {exc}")
-    except Exception as exc:  # noqa: BLE001 - 失败下次运行会按来源 / 载荷重建
-        logger.warning(f"复制托管时建视图失败，将按需重建: {exc}")
-    finally:
-        await release_project_path(target_key)
+        # occupied：目标视图正被占着，同原来拿不到预约时直接返回
+    elif reply.failed:
+        # 失败下次运行会按来源 / 载荷重建
+        logger.warning(f"复制托管时建视图失败，将按需重建: {reply.message}")
 
 
 async def on_script_removed(script_id: str) -> None:
     """删除托管：宿主删完 ``data/<uid>`` 之后删本托管的视图，再起一轮运行池对账（不等结果）。
 
-    视图不放在 ``data/<uid>/`` 下（免得进整目录备份）。视图上记着别的属主、或记着别的托管（目录名只取
-    uuid 前 12 位，撞上时共用）时不删，记一句。
+    视图不放在 ``data/<uid>/`` 下（免得进整目录备份）。视图上记着别的属主时不删，记一句。看属主、删视图、
+    起对账都在项目服务的 ``script_removed`` 作业里做（视图归项目更新管，它是唯一写入方）。
     """
 
-    from auto_mas_core.host.utils import io as _io
-    from maafw_native.layout import view_dir
-    from maafw_project_update.host.embedded_project import view_owner
-    from maafw_project_update.host.live_projects import reconcile_in_background
+    from maafw_adapter_kit.services import (
+        PROJECT_SCRIPT_REMOVED,
+        script_removed_request,
+    )
 
-    embedded_copy = view_dir(script_id)
-    if embedded_copy.exists():
-        recorded = await asyncio.to_thread(view_owner, embedded_copy)
-        if recorded is not None and (
-            recorded[0] != MSS_OWNER or recorded[1].lower() != str(script_id).lower()
-        ):
-            logger.warning(
-                f"删除托管 {script_id} 时视图记着 {recorded[0]} / {recorded[1]}，不是本托管，不删: "
-                f"{embedded_copy}"
-            )
-        else:
-            await asyncio.to_thread(_io.force_rmtree, embedded_copy)
-    reconcile_in_background("script-deleted")
+    from .services import client
+
+    reply = await client("删除托管").run(
+        PROJECT_SCRIPT_REMOVED,
+        script_removed_request(script_id=script_id, owner=MSS_OWNER),
+    )
+    if reply.failed:
+        # 原来删目录出错时异常往上抛（钩子失败），文案取原话
+        raise RuntimeError(reply.message)
+    if reply.get("outcome") == "kept_other_owner":
+        logger.warning(
+            f"删除托管 {script_id} 时视图记着 {reply.get('recorded_owner')}，不是本托管，不删: "
+            f"{reply.get('view_path')}"
+        )
 
 
 # ---------------------------------------------------------------------------

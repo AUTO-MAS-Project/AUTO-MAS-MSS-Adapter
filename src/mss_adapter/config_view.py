@@ -12,7 +12,7 @@
 读的时机与通用 MFW 流程（``runner_task`` / ``embedded_manager``）完全相同：每个函数都在调用那一刻现读，
 不冻结——账号的 ``Data.*`` 由流程自己写、代理地址与静默模式受全局设置影响，托管级字段虽然在 X 锁里，
 运行中的资源包修复仍可能改写导入报告。写字段一律「改一项、提交一次」，次数与先后照旧。
-吃配置对象的现成宿主函数（``proxy_times_used_up``、``client_executable_path``、``resolve_update_proxy_url``、
+吃配置对象的现成宿主函数（``proxy_times_used_up``、``client_executable_path``、
 ``fill_default_task_snapshots`` ……）也只在这里调。
 
 MSS 自己的两项：账号引用的计划表今天那一格（:func:`plan_slot`，照旧经 ``related_config["PlanConfig"]``
@@ -40,21 +40,10 @@ from maafw_interface.runner.plan_transforms import MaaFWPeriodLimits
 from maafw_interface.runner.run_plan import resolve_run_selection
 from maafw_runner.host.desktop_game import MaaFWDesktopGameSpec
 from maafw_native.layout import view_dir
-from maafw_project_update.host.embedded_project import (
-    follow_source_enabled,
-    shell_hint_from_report,
-)
 from maafw_adapter_kit.proxy_quota import (
     proxy_times_used_up as _proxy_times_used_up,
 )
-from maafw_project_update.host.resource_repair import MaaFWRepairRequest
 from maafw_adapter_kit.run_settings import period_limits as _period_limits
-from maafw_project_update.host.update_credentials import (
-    AutoUpdateMode,
-    resolve_auto_update_mode,
-    resolve_update_credentials,
-    resolve_update_proxy_url,
-)
 from mss_adapter.config import MSSConfig
 from mss_adapter.rules import PLAN_MODE_FIXED
 
@@ -140,10 +129,6 @@ def project_root(script_id: str, script: Any) -> Path:
     """有效项目根（视图），未 ``resolve()``。有效根不取决于配置，``script`` 只为调用方签名不变。"""
 
     return view_dir(script_id)
-
-
-def auto_update_mode(script: Any) -> AutoUpdateMode:
-    return resolve_auto_update_mode(script)
 
 
 def emulator_target(script: Any) -> str:
@@ -256,29 +241,10 @@ def win32_methods_raw(script: Any) -> tuple[Any, Any, Any]:
     )
 
 
-def proxy_url(script: Any) -> str | None:
-    """托管级更新代理优先，留空跟随全局（``resolve_update_proxy_url``）；每次现取。"""
-
-    return resolve_update_proxy_url(script)
-
-
 def all_task_snapshots(script: Any) -> list[Any]:
     """托管下全部账号 ``Task.TaskSnapshot`` 的原值（``.project.log`` 打码用）。"""
 
     return script_task_snapshots(script)
-
-
-def repair_request(script_id: str, script_name: str, script: Any) -> MaaFWRepairRequest:
-    """资源包修复的请求：字段的读取先后同通用流程（开发者模式 → 渠道 → 代理 → 外壳家族）。"""
-
-    return MaaFWRepairRequest(
-        script_id=script_id,
-        script_name=script_name,
-        follow_source=follow_source_enabled(script),
-        channel=resolve_update_credentials(script).channel,
-        proxy_url=resolve_update_proxy_url(script),
-        shell_hint=shell_hint_from_report(script),
-    )
 
 
 def desktop_spec(script: Any, *, for_close: bool = False) -> MaaFWDesktopGameSpec:
@@ -502,7 +468,6 @@ __all__ = [
     "adb_methods_raw",
     "adb_path_raw",
     "all_task_snapshots",
-    "auto_update_mode",
     "client_version",
     "configured_hwnd",
     "desktop_spec",
@@ -524,9 +489,7 @@ __all__ = [
     "project_root",
     "proxy_times",
     "proxy_times_used_up",
-    "proxy_url",
     "remained_day",
-    "repair_request",
     "run_selection",
     "run_time_limit",
     "run_times_limit",
