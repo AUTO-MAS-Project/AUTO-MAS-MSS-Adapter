@@ -84,8 +84,6 @@ class Plugin(OwnerServiceMixin, ScriptAdapterPlugin):
 
         登记只试一次（生命周期钩子里的调用不重试）；登记不上（属主名冲突等）启用失败，同原来直接登记时。
         """
-        # 管理器读托管记录的旧形属主入口（切到项目服务之前还用）
-        _owner.build_owner()
         SLOT.bind(self.services)
         try:
             reply = await client("on_enable").call_once(
@@ -112,7 +110,6 @@ class Plugin(OwnerServiceMixin, ScriptAdapterPlugin):
                 except Exception as exc:  # noqa: BLE001 - 停用不因注销失败中断
                     logger.warning(f"MSS 专项注销托管属主失败：{exc}")
         finally:
-            _owner.drop_owner()
             SLOT.unbind()
 
     async def teardown_blockers(self) -> list[str]:

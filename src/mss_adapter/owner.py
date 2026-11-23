@@ -5,11 +5,11 @@
 """MSS 的托管属主（取代宿主 ``app/task/MSS/registration.py`` 里属主那一半）。
 
 :data:`OWNER` 是新形属主（专项共用库的 ``ConfigOwner``），按确切类型 ``MSSConfig`` 认领 MSS 托管：插件混入
-``OwnerServiceMixin``，项目服务按服务名前缀 ``maafw.owner.mss_adapter.v1`` 现取它的 8 个操作。属主名照旧是
-``mss_adapter``。管理器读托管记录暂时还经 ``resolve_owner``（旧形 ``BuiltinConfigOwner``），切到项目服务后去掉。
+``OwnerServiceMixin``，项目服务按服务名前缀 ``maafw.owner.mss_adapter.v1`` 现取它的 8 个操作；管理器读托管
+记录、写回项目记录也直接用它（本地调，不绕道项目服务）。属主名照旧是 ``mss_adapter``。
 
 规则 L：本模块顶层只导入标准库、解析库、专项共用库的 ``owner_entry``（它顶层只导入解析库）和本包的
-``rules``；配置类与旧形属主在函数里现导入。
+``rules``；配置类在函数里现导入。
 """
 
 from __future__ import annotations
@@ -27,8 +27,6 @@ OWNER_SERVICE = owner_service_prefix(MSS_OWNER)
 
 # 原文取自 api_service/embedded.py 的 _project_flavor_mismatch（type_key 为 MSS），一字不改
 MISMATCH_MESSAGE = f"这不是 {TYPE_KEY} 项目。要用别的项目，请新建通用 MFW 托管。"
-
-_OWNER: Any = None
 
 
 def project_mismatch(interface: Any) -> str | None:
@@ -65,46 +63,10 @@ OWNER = ConfigOwner(
 )
 
 
-def build_owner() -> Any:
-    """建本包的属主入口并记下（插件 ``on_enable`` 调）。"""
-
-    global _OWNER
-    from maafw_adapter_kit.owner_entry import BuiltinConfigOwner
-    from maafw_interface.interface.plan_rules import EMPTY_PLAN_RULES
-
-    from .config import MSSConfig
-
-    _OWNER = BuiltinConfigOwner(
-        MSS_OWNER,
-        lambda: MSSConfig,
-        plan_rules=EMPTY_PLAN_RULES,
-        project_mismatch=project_mismatch,
-    )
-    return _OWNER
-
-
-def drop_owner() -> None:
-    """插件停用时丢掉属主入口。"""
-
-    global _OWNER
-    _OWNER = None
-
-
-def resolve_owner() -> Any:
-    """当前的属主入口；插件没启用时抛 ``RuntimeError``。"""
-
-    if _OWNER is None:
-        raise RuntimeError("MSS 专项未启用，托管属主入口不可用")
-    return _OWNER
-
-
 __all__ = [
     "MISMATCH_MESSAGE",
     "MSS_OWNER",
     "OWNER",
     "OWNER_SERVICE",
-    "build_owner",
-    "drop_owner",
     "project_mismatch",
-    "resolve_owner",
 ]
