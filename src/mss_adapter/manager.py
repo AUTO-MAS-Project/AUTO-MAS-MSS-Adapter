@@ -23,6 +23,7 @@ import uuid
 from contextlib import suppress
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from auto_mas_core.host.config import config_manager
@@ -72,8 +73,11 @@ from maafw_adapter_kit.run_notices import (
     signal_summary_title,
     user_results_text,
 )
-from maafw_agent_env.host.runtime_check import describe_unusable_runtime
-from maafw_agent_env.host.runtime_route import resolve_runtime_pool_route
+from maafw_adapter_kit.services import (
+    AGENT_ENV_RUNTIME_CHECK,
+    AGENT_ENV_RUNTIME_ROUTE,
+    runtime_check_request,
+)
 from maafw_interface.runner.models import SERVER_MAINTENANCE
 from maafw_adapter_kit.signal_notice import (
     MaaFWSignalTracker,
@@ -82,6 +86,7 @@ from maafw_adapter_kit.signal_notice import (
 from maafw_adapter_kit.telemetry_project import record_project_run
 from maafw_project_update.host.update_credentials import AutoUpdateMode
 from mss_adapter import config_view
+from mss_adapter.services import client as service_client
 from auto_mas_core.adapters.script import point
 from auto_mas_core.host.utils import TASK_MODE_ZH, get_logger
 
@@ -330,9 +335,14 @@ class MSSManager(NotificationTaskBase):
         self.emulator_manager = await self._resolve_emulator_manager(script_config)
 
         # 自检看的是有效根：内嵌脚本的运行池版本钉在副本的投影标记上，不在来源目录。
-        environment_problem = await asyncio.to_thread(
-            describe_unusable_runtime, project_root
+        # agent 环境服务在工作线程里查（同原来 asyncio.to_thread）。
+        reply = await service_client("运行前检查").call(
+            AGENT_ENV_RUNTIME_CHECK, runtime_check_request(project_root)
         )
+        if reply.failed:
+            # 拿不到服务（agent 环境插件已停用或重载）：原来这里的异常往上抛，文案换成那句固定话
+            raise RuntimeError(reply.message)
+        environment_problem = reply.get("problem")
         if environment_problem:
             return environment_problem
 
@@ -354,8 +364,21 @@ class MSSManager(NotificationTaskBase):
             logger.warning(f"MFW 内置运行取模拟器实例失败，将按无模拟器继续：{exc}")
             return None
 
+    @staticmethod
+    async def _runtime_pool_route() -> SimpleNamespace:
+        """经 agent 环境服务解析 Runtime Pool 路由，交回 ``root``（``Path``）与 ``pool_id``。
+
+        服务在工作线程里取（可能等运行池的进程锁）；路由失败时原来往上抛的异常换成同一句话的
+        ``RuntimeError``（实施方案 §2.2）。
+        """
+
+        reply = await service_client("运行池路由").call(AGENT_ENV_RUNTIME_ROUTE)
+        if reply.failed:
+            raise RuntimeError(reply.message)
+        return SimpleNamespace(root=Path(reply["root"]), pool_id=reply["pool_id"])
+
     def _build_inner_task(self, route: Any) -> "MSSAccountRun":
-        """``route`` 是运行池路由（``resolve_runtime_pool_route``），调用方在工作线程里取。"""
+        """``route`` 是 :meth:`_runtime_pool_route` 的结果（``root``、``pool_id``）。"""
 
         # 延迟导入：账号流程经 runner 包 import maa，导入即打开 DLL。
         from mss_adapter.account_run import MSSAccountRun
@@ -602,7 +625,7 @@ class MSSManager(NotificationTaskBase):
                     raise
                 if not selected:
                     continue
-                route = await asyncio.to_thread(resolve_runtime_pool_route)
+                route = await self._runtime_pool_route()
                 self.inner_task = self._build_inner_task(route)
                 self._inner_finalized = False
                 try:
