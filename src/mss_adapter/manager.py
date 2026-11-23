@@ -72,8 +72,8 @@ from maafw_runner.host.run_notices import (
 )
 from maafw_agent_env.host.runtime_check import describe_unusable_runtime
 from maafw_agent_env.host.runtime_route import resolve_runtime_pool_route
+from maafw_interface.runner.models import SERVER_MAINTENANCE
 from maafw_runner.host.signal_notice import (
-    SERVER_MAINTENANCE,
     MaaFWSignalTracker,
     push_signal_notices,
 )

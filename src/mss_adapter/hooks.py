@@ -73,10 +73,10 @@ async def on_script_cloned(source: Any, target: Any) -> None:
     首次运行按来源目录导入。新视图当场记下本属主（``mss_adapter``）。
     """
 
+    from maafw_native.layout import view_dir
     from maafw_project_update.host.embedded_project import (
         FollowSourceCloneUnavailable,
         clone_embedded_copy,
-        embedded_project_dir,
         is_source_form,
     )
     from maafw_project_update.host.project_path import (
@@ -91,7 +91,7 @@ async def on_script_cloned(source: Any, target: Any) -> None:
     group_channel = str(source.Update.Channel or "stable")
     source_form = is_source_form(source)
 
-    target_key = await try_reserve_project_path(embedded_project_dir(str(target.uid)))
+    target_key = await try_reserve_project_path(view_dir(str(target.uid)))
     if target_key is None:
         return
     try:
@@ -120,13 +120,11 @@ async def on_script_removed(script_id: str) -> None:
     """
 
     from auto_mas_core.host.utils import io as _io
-    from maafw_project_update.host.embedded_project import (
-        embedded_project_dir,
-        view_owner,
-    )
+    from maafw_native.layout import view_dir
+    from maafw_project_update.host.embedded_project import view_owner
     from maafw_project_update.host.live_projects import reconcile_in_background
 
-    embedded_copy = embedded_project_dir(script_id)
+    embedded_copy = view_dir(script_id)
     if embedded_copy.exists():
         recorded = await asyncio.to_thread(view_owner, embedded_copy)
         if recorded is not None and (
@@ -154,7 +152,7 @@ def game_kind(script: Any, patch: dict[str, Any]) -> str | None:
     """
 
     from maafw_interface.interface.loader import load_interface_model_cached
-    from maafw_project_update.host.embedded_project import resolve_maafw_project_root
+    from maafw_native.layout import view_dir
 
     info = patch.get("Info") if isinstance(patch, dict) else None
     controller = (
@@ -164,7 +162,7 @@ def game_kind(script: Any, patch: dict[str, Any]) -> str | None:
     )
     if not controller:
         return None
-    root = resolve_maafw_project_root(str(script.uid), script)
+    root = view_dir(str(script.uid))
     if not root.is_dir():
         return None
     interface = load_interface_model_cached(root)
@@ -185,12 +183,12 @@ def desktop_session(script: Any) -> bool:
         _select_controller,
         resolve_run_selection,
     )
-    from maafw_project_update.host.embedded_project import resolve_maafw_project_root
+    from maafw_native.layout import view_dir
 
+    # 视图目录放在 try 外：托管 ID 不对时照旧往外抛，不当成「不支持」（原来那份抛的不是 ValueError）。
+    root = view_dir(str(script.uid))
     try:
-        interface = MaaFWInterfaceService().load(
-            resolve_maafw_project_root(str(script.uid), script)
-        )
+        interface = MaaFWInterfaceService().load(root)
         name, _ = resolve_run_selection(
             interface,
             configured_controller=str(script.Info.Controller),
