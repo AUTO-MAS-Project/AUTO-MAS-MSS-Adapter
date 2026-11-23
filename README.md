@@ -14,8 +14,10 @@ MSS（MaaStellaSora / 星塔旅人）专项插件：MSS 托管、账号与 MSS �
 
 - 宿主：已让出内置 MFW / M9A / MSS 的 AUTO-MAS（联调分支，见开工文档 §5）。宿主仍内置 MSS 时，加载本插件会报
   「当前 AUTO-MAS 仍内置 MFW / M9A / MSS，请换到让位分支」。
-- 插件服务：`requires = ("maafw.agent_env.v1", "maafw.runner.v1", "maafw.project.v1")`，即三块积木插件都要先启用。
-- 提供服务：`maafw.owner.mss_adapter.v1`（属主入口，项目更新插件按服务名现取）。
+- 插件服务：`requires` 按 MFW 服务化方案写全三个专项共有的 70 个服务操作名（专项共用库的常量拼成），三块积木插件
+  都要先启用。经服务调的都经 `services.SLOT`（插件启用时绑宿主给的解析器、停用时解，管理器、账号流程、钩子从槽里现取）。
+- 提供服务：属主服务 `maafw.owner.mss_adapter.v1.<操作>` 的 8 个操作（专项共用库的 `ConfigOwner` + `OwnerServiceMixin`），
+  启用时经项目服务 `maafw.project.v1.owner_register` 登记、停用时 `owner_unregister`（生命周期钩子里只试一次）。
 - 脚本类型键 `MSS`；只支持自动代理（`AUTO_PROXY`）；计划表类型 `MSSPlanConfig`；活动标识 `stellasora`。
 
 本地联调：把本仓库目录联接到联调宿主树的 `plugins\mss_adapter`，宿主启动时发现并加载（做法见开工文档 §6）。

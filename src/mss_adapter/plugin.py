@@ -4,9 +4,9 @@
 
 """MSS 专项插件声明：托管 / 账号 / 计划表类型、属主服务、执行外壳（取代宿主 ``app/task/MSS/registration.py``）。
 
-规则 L：本模块和它顶层的整条导入链里不出现别的插件包（三块积木、另两个专项）。项目更新插件只经服务
-``maafw.project.v1`` 调；属主入口在 ``owner.build_owner`` 里现导入专项共用库的 ``owner_entry``；托管生命周期
-钩子与按配置的判定在 ``hooks`` 里，积木与共用库都在函数里现导入。
+规则 L：本模块和它顶层的整条导入链里不出现别的插件包（三块积木、另两个专项）。三块服务插件只经服务调
+（``services.SLOT``：启用时绑宿主给的解析器、停用时解）；属主是专项共用库的新形 ``ConfigOwner``（``owner.OWNER``），
+经项目服务的 ``owner_register`` 登记；托管生命周期钩子与按配置的判定在 ``hooks`` 里。
 """
 
 from __future__ import annotations
@@ -17,11 +17,19 @@ from typing import Any
 
 from auto_mas_core import Config, ScriptAdapterPlugin, ScriptTypeDecl, TaskMode
 from auto_mas_core.host.utils import get_logger
+from maafw_adapter_kit.owner_entry import OwnerServiceMixin, owner_provides
+from maafw_adapter_kit.services import (
+    PROJECT_OWNER_REGISTER,
+    PROJECT_OWNER_UNREGISTER,
+    owner_register_request,
+    owner_unregister_request,
+)
 
 from . import hooks as _hooks
 from . import owner as _owner
 from .config import MSSConfig, MSSPlanConfig, MSSUserConfig
 from .expander import MSSExpander, prefetch_check, running_count
+from .services import REQUIRES, SLOT, client
 
 logger = get_logger("MSS 专项")
 
@@ -40,14 +48,13 @@ if not hasattr(ScriptAdapterPlugin, "on_script_cloned") or not {
         "当前 AUTO-MAS 版本过旧，缺少 MSS 专项要用的托管生命周期钩子，请升级 AUTO-MAS"
     )
 
-PROJECT_SERVICE = "maafw.project.v1"
 
-
-class Plugin(ScriptAdapterPlugin):
+class Plugin(OwnerServiceMixin, ScriptAdapterPlugin):
     script_type_key = "MSS"
-    requires = ("maafw.agent_env.v1", "maafw.runner.v1", PROJECT_SERVICE)
+    requires = REQUIRES
     wants = ()
-    provides_services = {_owner.OWNER_SERVICE: "owner_entry"}
+    provides_services = owner_provides(_owner.MSS_OWNER)
+    owner_entry = _owner.OWNER
     decl = ScriptTypeDecl(
         script_type=MSSConfig,
         user_type=MSSUserConfig,
@@ -62,10 +69,6 @@ class Plugin(ScriptAdapterPlugin):
         desktop_session=_hooks.desktop_session,
     )
 
-    def __init__(self, config: Any = None, record: Any = None) -> None:
-        super().__init__(config=config, record=record)
-        self._owner: Any = None
-
     async def pre_enable(self) -> None:
         """挂关联集合：账号的计划表引用（``Info.PlanMode``）与 ``config_view.plan_slot`` 都经它取。"""
         refs = {
@@ -77,26 +80,40 @@ class Plugin(ScriptAdapterPlugin):
         MSSUserConfig.related_config = refs
 
     async def on_enable(self) -> None:
-        """建属主入口并登记给项目更新插件（它每次经服务名现取入口）。"""
-        self._owner = _owner.build_owner()
-        await self.services.require(PROJECT_SERVICE)(
-            "owner.register", name=_owner.MSS_OWNER, service=_owner.OWNER_SERVICE
-        )
+        """先绑服务槽（管理器、账号流程、钩子从这里现取服务），再经项目服务登记属主。
+
+        登记只试一次（生命周期钩子里的调用不重试）；登记不上（属主名冲突等）启用失败，同原来直接登记时。
+        """
+        # 管理器读托管记录的旧形属主入口（切到项目服务之前还用）
+        _owner.build_owner()
+        SLOT.bind(self.services)
+        try:
+            reply = await client("on_enable").call_once(
+                PROJECT_OWNER_REGISTER,
+                owner_register_request(_owner.MSS_OWNER, _owner.OWNER_SERVICE),
+            )
+            reply.expect_ok()
+        except BaseException:
+            SLOT.unbind()
+            raise
 
     async def on_disable(self) -> None:
-        """服务还在就注销属主；失败只记 warning。"""
-        service = self.services.get(PROJECT_SERVICE)
-        if service is not None:
-            try:
-                await service("owner.unregister", name=_owner.MSS_OWNER)
-            except Exception as exc:  # noqa: BLE001 - 停用不因注销失败中断
-                logger.warning(f"MSS 专项注销托管属主失败：{exc}")
-        _owner.drop_owner()
-        self._owner = None
-
-    def owner_entry(self) -> Any:
-        """属主服务：返回本包的属主入口对象（项目更新插件调用，不带参数）。"""
-        return self._owner
+        """项目服务还在就注销属主；失败只记 warning。最后解开服务槽。"""
+        try:
+            # 项目服务已经不在就不用注销（同原来 services.get 拿不到时跳过）
+            if self.services.get(PROJECT_OWNER_UNREGISTER) is not None:
+                try:
+                    reply = await client("on_disable").call_once(
+                        PROJECT_OWNER_UNREGISTER,
+                        owner_unregister_request(_owner.MSS_OWNER),
+                    )
+                    if reply.failed:
+                        logger.warning(f"MSS 专项注销托管属主失败：{reply.message}")
+                except Exception as exc:  # noqa: BLE001 - 停用不因注销失败中断
+                    logger.warning(f"MSS 专项注销托管属主失败：{exc}")
+        finally:
+            _owner.drop_owner()
+            SLOT.unbind()
 
     async def teardown_blockers(self) -> list[str]:
         """还有 MSS 托管在跑时拒绝停用、重载、卸载（运行里直接用着本包和积木的模块）。"""
