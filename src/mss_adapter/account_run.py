@@ -104,7 +104,7 @@ from maafw_adapter_kit.device_state import (
     choose_game_package,
     optional_int,
 )
-from maafw_runner.host.host_client import (
+from maafw_adapter_kit.host_client import (
     WORKSTATION_LOCKED_MESSAGE,
     open_emulator_for_run,
     script_adb_env,
@@ -113,11 +113,6 @@ from maafw_runner.host.host_client import (
 from maafw_adapter_kit.option_secrets import (
     DPAPI_SECRET_OPENER,
     open_task_snapshot,
-)
-from maafw_runner.host.plan_run import (
-    MaaFWPlanRunEvent,
-    MaaFWPlanRunLog,
-    MaaFWPlanRunPoint,
 )
 from maafw_adapter_kit.owner_entry import record_payload
 from maafw_adapter_kit.proxy_quota import (
@@ -183,7 +178,7 @@ from maafw_adapter_kit.run_notices import (
     statistics_title,
     success_notice_text,
 )
-from maafw_runner.host.run_record import RUN_RECORD_HISTORY_KEY
+from maafw_adapter_kit.run_record import RUN_RECORD_HISTORY_KEY
 from maafw_adapter_kit.run_settings import (
     load_json_dict,
     load_script_hotkeys,
@@ -1220,7 +1215,7 @@ class MSSAccountRun(TaskExecuteBase):
             emulator_index,
             package_name,
             silent=config_view.silent_mode(),
-            emit=self._on_plan_run_event,
+            emit=self._on_service_event,
         )
         device_info = launch.device_info
         # 冷启动游戏时首任务闸门改按读盘判据放行（task_start_gate）
@@ -1338,14 +1333,6 @@ class MSSAccountRun(TaskExecuteBase):
         return await script_adb_env(
             self.emulator_manager, config_view.emulator_device(self.script_config)
         )
-
-    def _on_plan_run_event(self, event: MaaFWPlanRunEvent) -> None:
-        """开模拟器（``host_client.open_emulator_for_run``）的事件出口：账号日志、进度点（以本任务为 owner）。"""
-
-        if isinstance(event, MaaFWPlanRunLog):
-            self._append_log(event.message, warning=event.warning)
-        elif isinstance(event, MaaFWPlanRunPoint):
-            point(self, event.stage, state=event.state, key=event.key)
 
     def _on_service_log(
         self, message: str, *, warning: bool = False, at: float | None = None
