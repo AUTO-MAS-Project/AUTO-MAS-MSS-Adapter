@@ -580,6 +580,7 @@ class MSSManager(NotificationTaskBase):
                 record=self._record(),
                 phase=phase,
                 prefetch_paths=params.get("prefetch_paths", {}),
+                round_started_at=self._round_started_at,
             ),
         )
         await self._send_project_notice(reply)
