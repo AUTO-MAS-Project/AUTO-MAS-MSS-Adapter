@@ -19,8 +19,7 @@ MSS（MaaStellaSora / 星塔旅人）专项插件：MSS 托管、账号与 MSS �
   都要先启用。经服务调的都经 `services.SLOT`（插件启用时绑宿主给的解析器、停用时解，管理器、账号流程、钩子从槽里现取）。
 - 提供服务：属主服务 `maafw.owner.mss_adapter.v1.<操作>` 的 8 个操作（专项共用库的 `ConfigOwner` + `OwnerServiceMixin`），
   启用时经项目服务 `maafw.project.v1.owner_register` 登记、停用时 `owner_unregister`（生命周期钩子里只试一次）。
-- 发行包依赖仍写三块服务插件与两块库、共用库的 `>=0.2.0,<0.3`（暂时照旧）；发版准备时按 MFW 服务化方案改成对三块服务
-  插件只写下限。
+- 发行包依赖：两块库与共用库写 `>=0.3.0,<0.4`，对三块服务插件只写下限 `>=0.3.0`。
 - 脚本类型键 `MSS`；只支持自动代理（`AUTO_PROXY`）；计划表类型 `MSSPlanConfig`；活动标识 `stellasora`。
 
 本地联调：把本仓库目录联接到联调宿主树的 `plugins\mss_adapter`，宿主启动时发现并加载（做法见开工文档 §6）。
@@ -40,7 +39,7 @@ MSS（MaaStellaSora / 星塔旅人）专项插件：MSS 托管、账号与 MSS �
 | `config_view.py` | 流程读写配置的唯一入口 | `app/task/MSS/config_view.py` |
 | `arrange.py`、`rules.py` | 排队列、规则常量与项目判据 | 同名 |
 
-## 托管生命周期与宿主出口（未发布的 0.2 起）
+## 托管生命周期与宿主出口（0.2 起）
 
 要宿主带 SDK 的托管生命周期钩子、`ScriptTypeDecl.game_kind` / `desktop_session`（迁移分支合并 SDK 三组之后）；
 旧宿主上插件拒绝加载（「当前 AUTO-MAS 版本过旧……」）。这几项出口没有单独抬 SDK 版本号，所以 `auto-mas-core`

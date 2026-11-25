@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auto-mas-mss-adapter"
-version = "0.2.0"
+version = "0.3.0"
 description = "MSS (MaaStellaSora) specialized script adapter for AUTO-MAS"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12,<3.13"
@@ -15,17 +15,17 @@ keywords = [
   "auto-mas-plugin",
   "auto-mas-id:mss_adapter",
 ]
-# 直接 import 三块积木插件与专项共用库的模块（越界清单见 README），所以对积木也写次版本上限。
+# 直接导入两块库与专项共用库，写次版本上限；三块服务插件（agent 环境、运行、项目更新）只经服务调用、不导入它们的模块，只写下限。
 # 托管生命周期钩子、按配置判定游戏类型与桌面分身要宿主带 SDK 三组出口；这几项出口没有单独抬 SDK 的版本号
 # （仍是 5.9.0b1），下限写不出区别，插件导入时按 ScriptAdapterPlugin / ScriptTypeDecl 上有没有这些出口检查。
 dependencies = [
   "auto-mas-core>=5.9.0b1,<6",
-  "auto-mas-maafw-interface>=0.2.0,<0.3",
-  "auto-mas-maafw-native>=0.2.0,<0.3",
-  "auto-mas-maafw-agent-env>=0.2.0,<0.3",
-  "auto-mas-maafw-runner>=0.2.0,<0.3",
-  "auto-mas-maafw-project-update>=0.2.0,<0.3",
-  "auto-mas-maafw-adapter-kit>=0.2.0,<0.3",
+  "auto-mas-maafw-interface>=0.3.0,<0.4",
+  "auto-mas-maafw-native>=0.3.0,<0.4",
+  "auto-mas-maafw-agent-env>=0.3.0",
+  "auto-mas-maafw-runner>=0.3.0",
+  "auto-mas-maafw-project-update>=0.3.0",
+  "auto-mas-maafw-adapter-kit>=0.3.0,<0.4",
 ]
 
 [project.urls]
