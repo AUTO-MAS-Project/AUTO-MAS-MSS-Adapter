@@ -21,6 +21,7 @@ MSS 自己的两项：账号引用的计划表今天那一格（:func:`plan_slot
 
 from __future__ import annotations
 
+import inspect
 import json
 import uuid
 from collections.abc import Callable
@@ -143,10 +144,23 @@ def emulator_device(script: Any) -> str:
     return game_device_id(script)
 
 
-async def fill_default_snapshots(script_id: str, script: Any) -> None:
-    """新账号的默认任务队列（经 ``Config.update_user`` 走插件的保存前钩子，加密照常）。"""
+async def fill_default_snapshots(
+    script_id: str, script: Any, *, holds_lock: bool = False
+) -> None:
+    """新账号的默认任务队列（经 ``Config.update_user`` 走插件的保存前钩子，加密照常）。
 
-    await fill_default_task_snapshots(script_id, script)
+    ``holds_lock``：宿主 L2 替这一轮持着托管的 X 锁（管理器的 ``_host_locked_config`` 不为 None）。
+    共用库带这个参数时照常写；0.3.0 的共用库没有它，就不传（托管锁着时跳过，与原来相同）。按函数
+    签名认，不看版本号。
+    """
+
+    if (
+        holds_lock
+        and "holds_lock" in inspect.signature(fill_default_task_snapshots).parameters
+    ):
+        await fill_default_task_snapshots(script_id, script, holds_lock=True)
+    else:
+        await fill_default_task_snapshots(script_id, script)
 
 
 def source_path(script: Any) -> str:

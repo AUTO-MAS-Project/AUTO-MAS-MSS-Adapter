@@ -264,8 +264,13 @@ class MSSManager(NotificationTaskBase):
             if opened.kind != "opened":
                 return opened.reason
             self._project_lease = opened.lease
-            # 新账号的默认队列也会在线程里读取视图，继续持预约直到取到 X。
-            await config_view.fill_default_snapshots(script_id, script_config)
+            # 新账号的默认队列也会在线程里读取视图，继续持预约直到取到 X。宿主已持锁时告诉
+            # 共用库锁是替本轮持的，否则它见托管锁着就不写。
+            await config_view.fill_default_snapshots(
+                script_id,
+                script_config,
+                holds_lock=self._host_locked_config is not None,
+            )
             return None
 
         async def lock_before_release() -> str | None:
