@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auto-mas-mss-adapter"
-version = "0.3.0"
+version = "0.3.1"
 description = "MSS (MaaStellaSora) specialized script adapter for AUTO-MAS"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12,<3.13"
@@ -25,7 +25,7 @@ dependencies = [
   "auto-mas-maafw-agent-env>=0.3.0",
   "auto-mas-maafw-runner>=0.3.0",
   "auto-mas-maafw-project-update>=0.3.0",
-  "auto-mas-maafw-adapter-kit>=0.3.0,<0.4",
+  "auto-mas-maafw-adapter-kit>=0.3.1,<0.4",
 ]
 
 [project.urls]
