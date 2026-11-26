@@ -20,7 +20,7 @@ keywords = [
 # （仍是 5.9.0b1），下限写不出区别，插件导入时按 ScriptAdapterPlugin / ScriptTypeDecl 上有没有这些出口检查。
 dependencies = [
   "auto-mas-core>=5.9.0b1,<6",
-  "auto-mas-maafw-interface>=0.3.0,<0.4",
+  "auto-mas-maafw-interface>=0.3.1,<0.4",
   "auto-mas-maafw-native>=0.3.0,<0.4",
   "auto-mas-maafw-agent-env>=0.3.0",
   "auto-mas-maafw-runner>=0.3.0",
