@@ -39,7 +39,7 @@ Issues = "https://github.com/AUTO-MAS-Project/AUTO-MAS-MSS-Adapter/issues"
 where = ["src"]
 
 [tool.setuptools.package-data]
-mss_adapter = ["py.typed"]
+mss_adapter = ["py.typed", "ui/*.json", "ui/*.html", "ui/assets/*", "i18n/*.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

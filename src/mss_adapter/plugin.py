@@ -17,6 +17,7 @@ from typing import Any
 
 from auto_mas_core import Config, ScriptAdapterPlugin, ScriptTypeDecl, TaskMode
 from auto_mas_core.host.utils import get_logger
+from fastapi import APIRouter
 from maafw_adapter_kit.owner_entry import OwnerServiceMixin, owner_provides
 from maafw_adapter_kit.services import (
     PROJECT_OWNER_REGISTER,
@@ -29,7 +30,9 @@ from . import hooks as _hooks
 from . import owner as _owner
 from .config import MSSConfig, MSSPlanConfig, MSSUserConfig
 from .expander import MSSExpander, prefetch_check, running_count
-from .services import REQUIRES, SLOT, client
+from .panel_api import router as panel_router
+from .restore import RESTORE_POOLS
+from .services import PLUGIN_ID, REQUIRES, SLOT, client
 
 logger = get_logger("MSS 专项")
 
@@ -49,12 +52,17 @@ if not hasattr(ScriptAdapterPlugin, "on_script_cloned") or not {
     )
 
 
+router = APIRouter()
+router.include_router(panel_router, prefix=f"/api/plugin/{PLUGIN_ID}", include_in_schema=False)
+
+
 class Plugin(OwnerServiceMixin, ScriptAdapterPlugin):
     script_type_key = "MSS"
     requires = REQUIRES
     wants = ()
     provides_services = owner_provides(_owner.MSS_OWNER)
     owner_entry = _owner.OWNER
+    api_router = router
     decl = ScriptTypeDecl(
         script_type=MSSConfig,
         user_type=MSSUserConfig,
@@ -67,6 +75,8 @@ class Plugin(OwnerServiceMixin, ScriptAdapterPlugin):
         activity_game="stellasora",
         game_kind=_hooks.game_kind,
         desktop_session=_hooks.desktop_session,
+        first_account_mode="wizard",
+        restore_pools=RESTORE_POOLS,
     )
 
     async def pre_enable(self) -> None:

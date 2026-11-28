@@ -27,10 +27,17 @@ from pathlib import Path as NativePath
 from typing import Annotated, Any, ClassVar, Literal
 from uuid import UUID
 
-from auto_mas_core import PlanEntry, ScriptEntry, UserEntry
+from auto_mas_core import (
+    DeclarativeBlock,
+    HostBlock,
+    PlanEntry,
+    PluginBlock,
+    ScriptEntry,
+    UserEntry,
+)
 from auto_mas_core.host.config import (
-    ConfigGroup,
     ConfigCollection,
+    ConfigGroup,
     Virtual,
     collection,
     encrypted,
@@ -130,6 +137,14 @@ class WeeklyKeyPlan(PlanDaysConfig):
 
 class MSSPlanConfig(WeeklyKeyPlan):
     "MSS 计划表配置：每个日期槽位存一套悬赏试炼配置。"
+
+    ui_blocks = (
+        DeclarativeBlock(("Info",)),
+        PluginBlock(
+            "plan",
+            fallback_groups=("ALL", *calendar.day_name, *(f"Day{i}" for i in range(1, 32))),
+        ),
+    )
 
     class ALLFields(ConfigGroup):
         Key: schema_model.MSSPlanKey = Field(
@@ -276,6 +291,13 @@ class MSSUserConfig(UserEntry):
     """
 
     related_config: ClassVar = {}
+    ui_blocks = (
+        HostBlock("config_restore"),
+        DeclarativeBlock(("Info",)),
+        PluginBlock("user", fallback_groups=("Task", "Device")),
+        DeclarativeBlock(("Notify",)),
+        HostBlock("webhooks"),
+    )
 
     class DataFields(AccountRunFields, AccountRunStatusFields):
         PeriodTaskRecords: JsonDictString = Field(
@@ -429,6 +451,11 @@ class MSSConfig(ScriptEntry):
     """
 
     related_config: ClassVar = {}
+    ui_blocks = (
+        PluginBlock("script", fallback_groups=("Info", "Embedded", "Device", "Game", "Run")),
+        HostBlock("game_binding"),
+        DeclarativeBlock(("Update",)),
+    )
     DEFAULT_SCRIPT_NAME: ClassVar = "新 MSS 托管"
     USER_CONFIG_CLASS: ClassVar = MSSUserConfig
     DEFAULT_TASK_TIME_LIMIT_OVERRIDES: ClassVar = "{ }"
