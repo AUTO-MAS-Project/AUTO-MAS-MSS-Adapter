@@ -1,2 +1,4 @@
 include CHANGELOG.md
+recursive-include src/mss_adapter/ui *
+recursive-include src/mss_adapter/i18n *.json
 prune tests
